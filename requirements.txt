@@ -1,0 +1,6 @@
+fastapi~=0.112.1
+uvicorn
+minio~=7.2.8
+python-dotenv~=1.0.1
+python-multipart
+pydantic~=2.8.2
