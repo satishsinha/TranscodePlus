@@ -20,6 +20,7 @@ minio_client = Minio(
     secure=MINIO_SECURE
 )
 
+
 def upload_file_to_minio(file: UploadFile, object_name: str):
     try:
         # Ensure bucket exists

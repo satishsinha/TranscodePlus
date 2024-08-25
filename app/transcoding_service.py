@@ -21,7 +21,9 @@ MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME")
 RESOLUTIONS_FOLDER = os.getenv("RESOLUTIONS_FOLDER")
 
 
-def transcode_video(filename: str, resolutions: list = ["720p"]):
+def transcode_video(filename: str, resolutions=None):
+    if resolutions is None:
+        resolutions = ["720p"]
     try:
         # Define paths for local temporary files
         input_video = f"/tmp/{filename}"
