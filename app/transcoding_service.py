@@ -3,10 +3,13 @@ import subprocess
 from minio import Minio
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import HTTPException
+from urllib.parse import unquote
+from fastapi import HTTPException, APIRouter
 
 # Load environment variables
 load_dotenv()
+
+router = APIRouter()
 
 # Configure MinIO client
 minio_client = Minio(
@@ -21,15 +24,22 @@ MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME")
 RESOLUTIONS_FOLDER = os.getenv("RESOLUTIONS_FOLDER")
 
 
-def transcode_video(filename: str, resolutions=None):
+@router.post("/transcode/", tags=["Uploading & Transcoding Process"])
+def transcode_video(folder_name: str, filename: str, resolutions=None):
     if resolutions is None:
         resolutions = ["720p"]
+    resolutions_list = [res.strip() for res in resolutions.split(",")]
+
+    folder_name = unquote(folder_name)
+    filename = unquote(filename)
+
+    input_video = f"/tmp/{filename}"
+
     try:
-        # Define paths for local temporary files
-        input_video = f"/tmp/{filename}"
+        file_path = f"{folder_name}/{filename}"
 
         # Download input video from MinIO
-        minio_client.fget_object(MINIO_BUCKET_NAME, filename, input_video)
+        minio_client.fget_object(MINIO_BUCKET_NAME, file_path, input_video)
 
         # Initialize a dictionary to hold the output files information
         output_files = []
@@ -44,11 +54,12 @@ def transcode_video(filename: str, resolutions=None):
             "1080p": "1920:1080"
         }
 
-        for resolution in resolutions:
+        for resolution in resolutions_list:
             if resolution not in scales:
                 raise HTTPException(status_code=400, detail=f"Unsupported resolution: {resolution}")
 
             output_video = f"/tmp/{Path(filename).stem}_{resolution}.mp4"
+            print(output_video)
             scale = scales[resolution]
 
             # Run FFmpeg to transcode the video
@@ -60,14 +71,14 @@ def transcode_video(filename: str, resolutions=None):
             # Upload transcoded video to MinIO in the specified folder
             minio_client.fput_object(
                 MINIO_BUCKET_NAME,
-                f"{RESOLUTIONS_FOLDER}/{Path(output_video).name}",
+                f"{folder_name}/{RESOLUTIONS_FOLDER}/{Path(output_video).name}",
                 output_video
             )
 
             # Append information about the uploaded file
             output_files.append({
                 "resolution": resolution,
-                "s3_path": f"{MINIO_BUCKET_NAME}/{RESOLUTIONS_FOLDER}/{Path(output_video).name}",
+                "s3_path": f"{MINIO_BUCKET_NAME}/{folder_name}/{RESOLUTIONS_FOLDER}/{Path(output_video).name}",
                 "uploaded_file_name": Path(output_video).name
             })
 
