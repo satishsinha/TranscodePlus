@@ -35,11 +35,6 @@ def validate_file_extension(filename: str, allowed_extensions: set):
 
 @router.post("/upload/", tags=["Uploading & Transcoding Process"])
 def upload_file_to_minio(banner_file: UploadFile, video_file: UploadFile, folder_name: str):
-    print("Request reached")
-    print(f"Folder name: {folder_name}")
-    print(f"Banner file: {banner_file.filename}, Content type: {banner_file.content_type}")
-    print(f"Video file: {video_file.filename}, Content type: {video_file.content_type}")
-
     try:
         # Ensure bucket exists
         if not minio_client.bucket_exists(MINIO_BUCKET_NAME):
@@ -84,11 +79,11 @@ def upload_file_to_minio(banner_file: UploadFile, video_file: UploadFile, folder
 
         return {
             "status_code": 200,
-            "folder_name": f"{folder_name}",
             "message": "Files uploaded successfully",
+            "folder_name": f"{folder_name}",
             "banner_s3_path": f"{MINIO_BUCKET_NAME}/{banner_path}",
             "video_s3_path": f"{MINIO_BUCKET_NAME}/{video_path}",
-            "banner_uploaded_file_name": banner_file.filename,
+            "banner_uploaded_file_name": f"banner_{banner_file.filename}",
             "video_uploaded_file_name": video_file.filename
         }
     except S3Error as e:
