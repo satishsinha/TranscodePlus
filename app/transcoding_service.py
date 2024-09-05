@@ -26,14 +26,34 @@ RESOLUTIONS_FOLDER = os.getenv("RESOLUTIONS_FOLDER")
 
 @router.post("/transcode/", tags=["Uploading & Transcoding Process"])
 def transcode_video(folder_name: str, filename: str, resolutions=None):
-    if resolutions is None:
-        resolutions = ["720p"]
-    resolutions_list = [res.strip() for res in resolutions.split(",")]
+    resolutions_list = ("144p", "240p", "360p", "480p", "720p", "1080p")
 
     folder_name = unquote(folder_name)
     filename = unquote(filename)
 
     input_video = f"/tmp/{filename}"
+
+    # Define scales for different resolutions
+    scales = {
+        "144p": (256, 144),
+        "240p": (426, 240),
+        "360p": (640, 360),
+        "480p": (854, 480),
+        "720p": (1280, 720),
+        "1080p": (1920, 1080)
+    }
+
+    # Define a helper function to get the resolution from ffprobe output
+    def get_video_resolution(video_path):
+        cmd = [
+            "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+            "stream=width,height", "-of", "csv=p=0", video_path
+        ]
+        output = subprocess.check_output(cmd).decode().strip().split('\n')
+
+        # Extract width and height from the first line
+        width, height = map(int, output[0].split(","))
+        return width, height
 
     try:
         file_path = f"{folder_name}/{filename}"
@@ -41,31 +61,29 @@ def transcode_video(folder_name: str, filename: str, resolutions=None):
         # Download input video from MinIO
         minio_client.fget_object(MINIO_BUCKET_NAME, file_path, input_video)
 
-        # Initialize a dictionary to hold the output files information
+        # Get input video resolution
+        input_width, input_height = get_video_resolution(input_video)
+
+        # Filter resolutions that are lower than the input resolution
+        valid_resolutions = [
+            res for res, (width, height) in scales.items()
+            if res in resolutions_list and width < input_width and height < input_height
+        ]
+
+        if not valid_resolutions:
+            raise HTTPException(status_code=400, detail="No valid resolutions to transcode.")
+
+        # Initialize a list to hold the output files information
         output_files = []
 
-        # Define scales for different resolutions
-        scales = {
-            "144p": "256:144",
-            "240p": "426:240",
-            "360p": "640:360",
-            "480p": "854:480",
-            "720p": "1280:720",
-            "1080p": "1920:1080"
-        }
-
-        for resolution in resolutions_list:
-            if resolution not in scales:
-                raise HTTPException(status_code=400, detail=f"Unsupported resolution: {resolution}")
-
+        for resolution in valid_resolutions:
             output_video = f"/tmp/{Path(filename).stem}_{resolution}.mp4"
-            print(output_video)
-            scale = scales[resolution]
+            scale = f"scale={scales[resolution][0]}:{scales[resolution][1]}"
 
             # Run FFmpeg to transcode the video
             subprocess.run([
                 "ffmpeg", "-i", input_video,
-                "-vf", f"scale={scale}", output_video
+                "-vf", scale, output_video
             ], check=True)
 
             # Upload transcoded video to MinIO in the specified folder

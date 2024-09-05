@@ -4,3 +4,4 @@ minio~=7.2.8
 python-dotenv~=1.0.1
 python-multipart
 pydantic~=2.8.2
+starlette~=0.38.4

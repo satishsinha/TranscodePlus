@@ -23,7 +23,7 @@ minio_client = Minio(
 )
 
 ALLOWED_BANNER_EXTENSIONS = {'.jpg', '.jpeg', '.png'}
-ALLOWED_VIDEO_EXTENSIONS = {'.mp4'}
+ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.mov', '.MOV'}
 
 
 def validate_file_extension(filename: str, allowed_extensions: set):
